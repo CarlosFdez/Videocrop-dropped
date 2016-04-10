@@ -1,3 +1,5 @@
+const EventEmitter = require('events');
+
 class VideoPlayer {
     constructor(previewPane) {
         this.previewPane = $(previewPane);
@@ -5,23 +7,22 @@ class VideoPlayer {
         this.slider = new PlayerSlider(this.previewPane.find('.scrub')[0], this.videoPane)
         this.statusBar = new StatusBar(this.previewPane.find('.status-bar'));
 
-        this.videoPane.element.addEventListener('loadedmetadata', () => {
-            this.slider.setVideo(this.video);
-            this.statusBar.video = this.video;
-            this.previewPane.addClass('loaded');
+        this.videoPane.on('timeupdate', () => {
+            this.statusBar.currentTime = this.videoPane.currentTime;
         });
         this.videoPane.element.addEventListener('click', () => {
             this.togglePlaying();
         });
-        this.videoPane.element.addEventListener('timeupdate', () => {
-            this.statusBar.currentTime = this.videoPane.currentTime;
-        })
-
-        $(previewPane).on('keydown')
     }
     setVideo(video) {
         this.videoPane.setVideo(video);
-        this.video = video;
+
+        this.videoPane.once('loadedmetadata', () => {
+            this.video = video;
+            this.slider.setVideo(video);
+            this.statusBar.video = video;
+            this.previewPane.addClass('loaded');
+        });
         // the javascript event listener will take care of the rest
     }
     togglePlaying() {
@@ -31,12 +32,17 @@ class VideoPlayer {
 
 module.exports = VideoPlayer;
 
-class VideoPane {
+class VideoPane extends EventEmitter {
     constructor(element) {
+        super();
+
         this.element = element;
 
         this._seeking = false;
         this._nextTime = null;
+        this.element.addEventListener('loadedmetadata', () => {
+            this.emit('loadedmetadata');
+        })
         this.element.addEventListener('seeking', () => {
             this._seeking = true;
         });
@@ -46,6 +52,9 @@ class VideoPane {
                 this.element.currentTime = this._nextTime;
                 this._nextTime = null;
             }
+        });
+        this.element.addEventListener('timeupdate', () => {
+            this.emit('timeupdate', this.element.currentTime);
         });
     }
 
@@ -103,9 +112,9 @@ class VideoPane {
 }
 
 class PlayerSlider {
-    constructor(element, player) {
+    constructor(element, videoPane) {
         this.canvas = element;
-        this.player = player;
+        this.videoPane = videoPane;
         this.context = this.canvas.getContext('2d');
         this.startRenderLoop();
 
@@ -114,7 +123,7 @@ class PlayerSlider {
             if (evt.which != 1) return;
 
             var ratio = evt.clientX / this.canvas.clientWidth;
-            player.currentTime = this.video.duration * ratio;
+            videoPane.currentTime = this.video.duration * ratio;
         });
     }
 
@@ -146,7 +155,7 @@ class PlayerSlider {
 
         // draw seek marker line
         var thickness = 2; // todo: make configurable
-        var linePosition = Math.floor(this.player.ratio * canvas.width);
+        var linePosition = Math.floor(this.videoPane.ratio * canvas.width);
         var lineDrawStart = linePosition - Math.floor(thickness/2);
         ctx.fillStyle = "red";
         ctx.fillRect(lineDrawStart, 0, thickness, canvas.height);

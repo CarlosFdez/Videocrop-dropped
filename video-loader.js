@@ -1,25 +1,20 @@
+const EventEmitter = require('events');
 const spawn = require('child_process').spawn;
 const JSONStream = require('JSONStream');
 const ffmpeg = require('fluent-ffmpeg');
 
-module.exports = {}
-module.exports.getVideoData = function(filename, onLoad) {
-    result = {
-        timestamps: [],
-        keyframes: [],
-        metadata: null
-    };
+class FrameReader extends EventEmitter {
+    constructor(filename) {
+        super();
+        this.filename = filename;
+    }
 
-    // first load basic metadata
-    ffmpeg.ffprobe(filename, (err, metadata) => {
-        if (err) {
-            onLoad(err);
-            return;
-        }
+    start() {
+        var result = {
+            timestamps: [],
+            keyframes: [],
+        };
 
-        result.metadata = metadata;
-
-        // create stream that will add to the result
         var frameStream = JSONStream.parse('frames.*');
         frameStream.on('data', function(frame) {
             // note: pts is presentation time stamp
@@ -28,17 +23,39 @@ module.exports.getVideoData = function(filename, onLoad) {
                 result.keyframes.push(parseInt(frame['coded_picture_number']));
             }
         });
+
         frameStream.on('close', () => {
-            onLoad(null, result);
+            this.emit('complete', result);
         });
 
         // read and probe ffmpeg
-        probe = spawn('ffprobe', ['-show_frames', '-select_streams', 'v', '-of', 'json', filename]);
+        var probe = spawn('ffprobe', [
+            '-show_frames',
+            '-select_streams', 'v',
+            //'-read_intervals', '01:42%+#50',
+            '-of', 'json', this.filename]);
 
         probe.on('error', (err) => {
-            onLoad(err);
+            this.emit('error', err);
         });
 
         probe.stdout.pipe(frameStream);
-    });
+    }
 }
+
+module.exports = {}
+module.exports.loadMetadata = function(filename, onLoad) {
+    ffmpeg.ffprobe(filename, (err, metadata) => {
+        onLoad(err, metadata);
+    });
+};
+module.exports.getVideoData = function(filename, onLoad) {
+    var reader = new FrameReader(filename);
+    reader.on('complete', (data) => {
+        onLoad(null, data);
+    });
+    reader.on('error', (err) => {
+        onLoad(err);
+    });
+    reader.start();
+};

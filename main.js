@@ -46,13 +46,14 @@ app.on('ready', () => {
 		if (!files) return;
 
 		mainWindow.send('loading', files[0]);
-		loader.getVideoData(files[0], (err, metadata) => {
-			mainWindow.send('open-video', metadata, err);
-			/*return {
-				filename: filename,
-				framerate: 60, // hardcoded for now
-				totalFrames: 1000
-			}*/
+		loader.loadMetadata(files[0], (err, metadata) => {
+			if (err) return;
+			mainWindow.send('loaded-metadata', metadata);
+			loader.getVideoData(files[0], (err, videoData) => {
+				videoData.metadata = metadata;
+				mainWindow.send('open-video', videoData, err);
+			});
 		});
+
 	});
 });
