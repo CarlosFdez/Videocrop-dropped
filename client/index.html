@@ -1,20 +1,27 @@
 <!doctype html>
 <html>
-<html>
-    <link href="client.css" rel="stylesheet">
+<head>
+    <link href="reset.css" rel="stylesheet"/>
+    <link href="client.css" rel="stylesheet"/>
     <script src="mousetrap.min.js"></script>
     <script src="jquery-2.2.2.min.js"></script>
     <script src="client.js"></script>
-</html>
+</head>
 <body>
     <div class="preview-pane">
         <div class="player-container">
-            <video>
-            </video>
+            <div class='video-wrap'>
+                <video></video>
+            </div>
+            <canvas class="scrub"></canvas>
         </div>
-        <canvas class="scrub"></canvas>
         <div class="status-bar">
-            <span class="currentTime"></span> / <span class="totalDuration"></span>
+            <div class="progress show-loaded">
+                <span class="currentTime"></span> / <span class="totalDuration"></span>
+            </div>
+            <div class="progress hide-loaded">
+                Loading...
+            </div>
         </div>
     </div>
 </body>

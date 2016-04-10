@@ -1,6 +1,6 @@
 const spawn = require('child_process').spawn;
 const JSONStream = require('JSONStream');
-const ffmpeg = require('fluent-ffmpeg')
+const ffmpeg = require('fluent-ffmpeg');
 
 module.exports = {}
 module.exports.getVideoData = function(filename, onLoad) {
