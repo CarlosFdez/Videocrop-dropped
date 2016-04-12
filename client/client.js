@@ -2,6 +2,7 @@ const VideoPlayer = require('./player');
 const Video = require('./video');
 
 var player = null;
+var video = null;
 
 const ipc = require('electron').ipcRenderer;
 
@@ -9,14 +10,16 @@ ipc.on('loading', (evt, filename) => {
     console.log("loading " + filename);
     console.log(new Date().toString() + ' started loading');
 });
-ipc.on('open-video', (evt, videoData) => {
-    console.log(new Date().toString() + ' finished loading');
-    player.setVideo(new Video(videoData));
-    console.log(videoData);
-});
+
 ipc.on('loaded-metadata', (evt, metadata) => {
     console.log(new Date().toString() + ' loaded metadata');
-
+    video = new Video(metadata)
+    player.setVideo(video);
+});
+ipc.on('open-video', (evt, videoData) => {
+    console.log(new Date().toString() + ' finished loading');
+    video.addFramedata(videoData);
+    console.log(videoData);
 });
 
 $(document).ready(() => {
@@ -30,10 +33,10 @@ Mousetrap.bind('space', () => {
 
 Mousetrap.bind('left', () => {
     player.videoPane.pause();
-    player.videoPane.currentFrame--;
+    player.videoPane.decrementFrame();
 });
 
 Mousetrap.bind('right', () => {
     player.videoPane.pause();
-    player.videoPane.currentFrame++;
+    player.videoPane.incrementFrame();
 });

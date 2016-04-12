@@ -38,16 +38,12 @@ class VideoPane extends EventEmitter {
 
         this.element = element;
 
-        this._seeking = false;
         this._nextTime = null;
         this.element.addEventListener('loadedmetadata', () => {
             this.emit('loadedmetadata');
         })
-        this.element.addEventListener('seeking', () => {
-            this._seeking = true;
-        });
+
         this.element.addEventListener('seeked', () => {
-            this._seeking = false;
             if (this._nextTime) {
                 this.element.currentTime = this._nextTime;
                 this._nextTime = null;
@@ -81,6 +77,15 @@ class VideoPane extends EventEmitter {
             this.element.pause();
     }
 
+    // todo: move this function to some throttler
+    _setCurrentTimeThrottled(newTime) {
+        if (this.element.seeking) {
+            this._nextTime = newTime;
+        } else {
+            this.element.currentTime = newTime;
+        }
+    }
+
     get ratio() {
         return this.element.currentTime / this.video.duration;
     }
@@ -90,24 +95,18 @@ class VideoPane extends EventEmitter {
     }
 
     set currentTime(newTime) {
-        // todo: snap to position
-        this.currentFrame = this.video.frameOfTimestamp(newTime); // snap to frame
+        var newTime = this.video.currentFrame(newTime); // snap to frame
+        this._setCurrentTimeThrottled(newTime);
     }
 
-    get currentFrame() {
-        if (!this.video) return 0;
-        return this.video.frameOfTimestamp(this.element.currentTime);
+    incrementFrame() {
+        var nextTime = this.video.nextFrame(this.currentTime);
+        this._setCurrentTimeThrottled(nextTime);
     }
 
-    set currentFrame(newFrame) {
-        if (!this.video) return;
-
-        var newTime = this.video.timeOfFrame(newFrame);
-        if (this._seeking) {
-            this._nextTime = newTime;
-        } else {
-            this.element.currentTime = newTime;
-        }
+    decrementFrame() {
+        var nextTime = this.video.previousFrame(this.currentTime);
+        this._setCurrentTimeThrottled(nextTime);
     }
 }
 
