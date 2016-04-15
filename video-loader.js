@@ -2,32 +2,14 @@ const EventEmitter = require('events');
 const spawn = require('child_process').spawn;
 const JSONStream = require('JSONStream');
 const ffmpeg = require('fluent-ffmpeg');
+const Transform = require('stream').Transform;
 
-class FrameReader extends EventEmitter {
+class FrameReader {
     constructor(filename) {
-        super();
         this.filename = filename;
     }
 
-    start() {
-        var result = {
-            timestamps: [],
-            keyframes: [],
-        };
-
-        var frameStream = JSONStream.parse('frames.*');
-        frameStream.on('data', function(frame) {
-            // note: pts is presentation time stamp
-            result.timestamps.push(parseFloat(frame['pkt_pts_time']));
-            if (frame['key_frame'] == 1) {
-                result.keyframes.push(parseInt(frame['coded_picture_number']));
-            }
-        });
-
-        frameStream.on('close', () => {
-            this.emit('complete', result);
-        });
-
+    createDataStream() {
         // read and probe ffmpeg
         var probe = spawn('ffprobe', [
             '-show_frames',
@@ -35,11 +17,23 @@ class FrameReader extends EventEmitter {
             //'-read_intervals', '01:42%+#50',
             '-of', 'json', this.filename]);
 
-        probe.on('error', (err) => {
-            this.emit('error', err);
-        });
+        var frameStream = JSONStream.parse('frames.*');
 
-        probe.stdout.pipe(frameStream);
+        var transformStream = new Transform({
+            transform: function(frame, encoding, callback) {
+                callback(null, {
+                    coded_picture_number: parseInt(frame['coded_picture_number']),
+                    timestamp: parseFloat(frame['pkt_pts_time']),
+                    keyframe: frame['key_frame'] == 1
+                });
+            },
+            readableObjectMode : true,
+            writableObjectMode: true
+        })
+
+        return probe.stdout
+            .pipe(frameStream)
+            .pipe(transformStream);
     }
 }
 
@@ -50,12 +44,23 @@ module.exports.loadMetadata = function(filename, onLoad) {
     });
 };
 module.exports.getVideoData = function(filename, onLoad) {
+    var results = {
+        timestamps: [],
+        keyframes: []
+    }
     var reader = new FrameReader(filename);
-    reader.on('complete', (data) => {
-        onLoad(null, data);
+    var stream = reader.createDataStream();
+    stream.on('data', (frame) => {
+        results.timestamps.push(frame.timestamp);
+        if (frame.keyframe) {
+            results.keyframes.push(frame.coded_picture_number);
+        }
     });
-    reader.on('error', (err) => {
+    stream.on('error', (err) => {
         onLoad(err);
     });
-    reader.start();
+    stream.on('end', () => {
+        console.log('complate');
+        onLoad(null, results);
+    });
 };
