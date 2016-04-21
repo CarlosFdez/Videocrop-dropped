@@ -3,6 +3,7 @@
 	"version" : "0.0.1",
 	"main": "main.js",
 	"dependencies": {
+		"JSONStream": "latest",
 		"fluent-ffmpeg": "latest"
 	}
 }

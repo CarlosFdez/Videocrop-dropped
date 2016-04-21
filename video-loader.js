@@ -5,17 +5,29 @@ const ffmpeg = require('fluent-ffmpeg');
 const Transform = require('stream').Transform;
 
 class FrameReader {
-    constructor(filename) {
+    constructor(filename, options) {
         this.filename = filename;
+        this.options = options || {};
     }
 
     createDataStream() {
+        var interval_options = [];
+        var skip_frames = []
+        if (this.options.interval) {
+            // '01:42%+#50'
+            interval_options = ['-read_intervals', this.options.interval];
+        }
+        if (this.options.keyframes) {
+            skip_frames = ['-skip_frame', 'nokey']
+        }
+
         // read and probe ffmpeg
         var probe = spawn('ffprobe', [
             '-show_frames',
-            '-select_streams', 'v',
-            //'-read_intervals', '01:42%+#50',
-            '-of', 'json', this.filename]);
+            '-select_streams', 'v'
+        ].concat(interval_options).concat(skip_frames).concat([
+            '-of', 'json', this.filename
+        ]));
 
         var frameStream = JSONStream.parse('frames.*');
 
@@ -31,13 +43,26 @@ class FrameReader {
             writableObjectMode: true
         })
 
-        return probe.stdout
+        var outputStream = probe.stdout
             .pipe(frameStream)
             .pipe(transformStream);
+        outputStream.kill = () => {
+            probe.kill('SIGINT')
+
+            // this is windows only, check if windows and then perform it
+            spawn('taskkill', ['/pid', probe.pid, '/f', '/t'])
+        }
+
+        return outputStream
     }
 }
 
-module.exports = {}
+module.exports = {};
+module.exports.getFrameStream = function(filename, options={}) {
+    var reader = new FrameReader(filename, options);
+    var stream = reader.createDataStream();
+    return stream;
+}
 module.exports.loadMetadata = function(filename, onLoad) {
     ffmpeg.ffprobe(filename, (err, metadata) => {
         onLoad(err, metadata);
@@ -60,7 +85,6 @@ module.exports.getVideoData = function(filename, onLoad) {
         onLoad(err);
     });
     stream.on('end', () => {
-        console.log('complate');
         onLoad(null, results);
     });
 };
