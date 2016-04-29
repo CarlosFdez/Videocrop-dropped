@@ -50,31 +50,210 @@ VideoPlayer.Mode = {
 
 module.exports = VideoPlayer;
 
+// used internally by VideoPane
+class AudioElementController extends EventEmitter {
+    constructor() {
+        super()
+
+        this.audioElement = document.createElement("audio")
+        this._track = 0
+        this._threshold = 40 // stop loading additional frames when we have this many left
+
+        // todo: allow this to be deleted if we want to prevent leaks
+        this._requestingFrame = false;
+        this._interval = window.setInterval(() => {
+            if (!this.video) return;
+            if (!this.sourceBuffer) return;
+            if (this.sourceBuffer.updating) return;
+            if (this._requestingFrame) return;
+            if (this.bufferedDataAvailable > this._threshold) return;
+
+            var currentBuffer = this._getBufferedTimeRange(this.currentTime)
+            if (currentBuffer && currentBuffer.end >= this.duration) return;
+
+            var defaultStart = (this.currentTime - this.currentTime % 5) || 0;
+            var startTime = (currentBuffer) ? currentBuffer.end : defaultStart
+
+            this._requestFrame(startTime, 5)
+        }, 10);
+
+        this.mediaSource = new MediaSource()
+        this.audioElement.src = URL.createObjectURL(this.mediaSource)
+
+        this.mediaSource.addEventListener('sourceopen', (evt) => {
+            if (evt.target != this.mediaSource) return; // this was a double restartBuffering()
+            this.sourceBuffer = this.mediaSource.addSourceBuffer('audio/aac')
+
+            this.sourceBuffer.addEventListener('updateend', (evt) => {
+                if (evt.target != this.sourceBuffer) return; // this was a double restartBuffering()
+                //this.sourceBuffer.timestampOffset += 5
+                this.emit('has-data')
+            })
+
+            // start buffering
+
+        });
+    }
+
+    _requestFrame(startAt, duration) {
+        if (this._requestingFrame) {
+            console.log('double requesting - debug why this is happening')
+            return
+        }
+
+        this._requestingFrame = true;
+
+        var frame = {
+            track: this._track,
+            startAt: startAt,
+            endAt: Math.min(startAt + duration, this.duration),
+            data: null
+        }
+
+        var path = "audio-packet://" + this.video.filename +
+            "?start=" + startAt + "&duration=" + this.frameDuration + "&track=" + this._track
+        var xhr = new XMLHttpRequest
+        xhr.open('get', path)
+        xhr.responseType = 'arraybuffer'
+        xhr.onload = () => {
+            this._requestingFrame = false
+
+            // if the audio track changed, its no longer valid
+            if (frame.track != this.track) {
+                return; // do nothing
+            }
+
+            var arr = new Uint8Array(xhr.response)
+            frame.data = arr
+
+            // start at?
+            this.sourceBuffer.timestampOffset = frame.startAt
+            this.sourceBuffer.appendWindowEnd = frame.endAt
+            console.log('append start' + frame.startAt  + ' append end ' + frame.endAt)
+            this.sourceBuffer.appendBuffer(frame.data)
+        };
+        xhr.send();
+    }
+
+    _getBufferedTimeRange(position) {
+        if (!this.sourceBuffer) return null
+        var buffered = this.sourceBuffer.buffered
+        for (let i = 0; i < buffered.length; i++) {
+            let start = buffered.start(i)
+            let end = buffered.end(i)
+            if (start <= position && end >= position) {
+                return { start: start, end: end }
+            }
+        }
+        return null;
+    }
+
+    // returns if there is enough data to play
+    get hasEnoughData() {
+        // todo: handle end of stream
+        return this.bufferedDataAvailable > 3
+    }
+
+    get bufferedDataAvailable() {
+        var range = this._getBufferedTimeRange(this.currentTime)
+        if (range == null) return 0;
+        return range.end - this.currentTime
+    }
+
+    get track() {
+        return this._track
+    }
+
+    set track(newTrack) {
+        this._track = newTrack
+        if (this.sourceBuffer.updating) {
+            this.once('has-data', () => { this.track = newTrack })
+        } else {
+            this.sourceBuffer.remove(0, this.video.duration)
+        }
+    }
+
+    get currentTime() {
+        return this.audioElement.currentTime
+    }
+
+    set currentTime(newTime) {
+        this.audioElement.currentTime = newTime
+    }
+
+    get duration() {
+        return this.video.duration
+    }
+
+    get durationRemaining() {
+        var range = this._getBufferedTimeRange(this.currentTime)
+        console.log(range)
+        if (range) {
+            return range.end - this.currentTime
+        }
+        return 0
+    }
+
+    startBuffering(onCanStart) {
+        if (this.hasEnoughData) {
+            onCanStart()
+        } else {
+            this.once('has-data', () => this.startBuffering(onCanStart))
+        }
+    }
+
+    play() {
+        this.audioElement.play()
+    }
+
+    pause() {
+        this.audioElement.pause()
+    }
+
+    set video(video) {
+        this._video = video
+        this.mediaSource.duration = this._video.duration
+    }
+
+    get video() {
+        return this._video;
+    }
+}
+
 class VideoPane extends EventEmitter {
     constructor(element) {
         super();
 
-        this.element = element;
+        this.element = element
+        this.element.muted = true
+        this.audio = new AudioElementController(this)
 
         this.element.addEventListener('loadedmetadata', () => {
-            this.emit('loadedmetadata');
+            this.emit('loadedmetadata')
         })
         this.element.addEventListener('timeupdate', () => {
-            this.emit('timeupdate', this.element.currentTime);
+            this.emit('timeupdate', this.element.currentTime)
+
+            if (Math.abs(this.audio.currentTime - this.currentTime) > 0.03) {
+                console.log('desync corrected' + this.element.currentTime + '_' + this.audio.currentTime + "_" + this.element.currentTime)
+                this.audio.currentTime = this.element.currentTime;
+            }
         })
 
         this._nextTime = null;
         this.element.addEventListener('seeked', () => {
             if (this._nextTime) {
-                this.element.currentTime = this._nextTime;
-                this._nextTime = null;
+                this.element.currentTime = this._nextTime
+                this._nextTime = null
             }
+            this.emit('seeked', this.element.currentTime)
         })
     }
 
     setVideo(video) {
-        this.video = video;
-        this.element.src = video.filename;
+        this.video = video
+        this.element.src = video.filename
+        this.audio.video = video
     }
 
     togglePlaying() {
@@ -87,12 +266,20 @@ class VideoPane extends EventEmitter {
 
     play() {
         // todo: check for unplayable regions (maybe)?
-        this.element.play();
+        if (this.element.paused) {
+            this.audio.currentTime = this.currentTime
+            this.audio.startBuffering(() => {
+                this.element.play()
+                this.audio.play()
+            })
+        }
     }
 
     pause() {
-        if (!this.element.paused)
+        if (!this.element.paused) {
             this.element.pause();
+            this.audio.pause();
+        }
     }
 
     get ratio() {
@@ -111,6 +298,7 @@ class VideoPane extends EventEmitter {
         } else {
             this.element.currentTime = newTime;
         }
+        this.audio.currentTime = newTime;
     }
 
     incrementFrame() {

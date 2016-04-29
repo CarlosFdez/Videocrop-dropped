@@ -68,23 +68,38 @@ module.exports.loadMetadata = function(filename, onLoad) {
         onLoad(err, metadata);
     });
 };
-module.exports.getVideoData = function(filename, onLoad) {
-    var results = {
-        timestamps: [],
-        keyframes: []
-    }
-    var reader = new FrameReader(filename);
-    var stream = reader.createDataStream();
-    stream.on('data', (frame) => {
-        results.timestamps.push(frame.timestamp);
-        if (frame.keyframe) {
-            results.keyframes.push(frame.coded_picture_number);
-        }
-    });
-    stream.on('error', (err) => {
-        onLoad(err);
-    });
-    stream.on('end', () => {
-        onLoad(null, results);
-    });
-};
+module.exports.getVideoStream = function(filename) {
+    // var child = spawn('ffmpeg', [
+    //     '-i', filename,
+    //     '-map', 'v', '-map', 'a:0',
+    //     '-t', '5',
+    //     '-codec', 'copy', '-f', 'matroska', '-'])
+    var child = spawn('ffmpeg', [
+        '-i', filename,
+        '-map', 'v', '-map', 'a:0',
+        '-t', '1',
+        '-vcodec', 'vp8',
+        '-f', 'webm',
+        //'-g', '1',
+        '-'])
+    //child.stderr.on('data', (err) => { throw err; })
+    return child.stdout
+}
+module.exports.getAudioStream = function(filename, trackNumber, options={}) {
+    var seekTime = options.seekTo || 0
+    var duration = options.duration || 5
+
+    var child = spawn('ffmpeg', [
+        '-ss', seekTime,
+        '-i', filename,
+        '-ss', 0,
+        '-map', 'a:' + trackNumber,
+        '-t', duration + 0.10,
+        '-force_key_frames', seekTime + ',' + (seekTime + duration),
+        '-f', 'adts',
+        '-codec', 'aac',
+        '-'])
+
+    // -f s16le -acodec pcm_s16le todo) take and pip
+    return child.stdout
+}

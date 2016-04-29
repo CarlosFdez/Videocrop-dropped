@@ -80,6 +80,8 @@ class Video {
 
         this.regions = new RegionCollection()
         this.regions.addRegion(0, this.duration / 2)
+
+        this._metadata = videoMetadata // store if I want to debug
     }
 
     get totalFrames() {
