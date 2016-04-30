@@ -278,6 +278,11 @@ class AudioElementController extends EventEmitter {
     }
 }
 
+function roundAtMilliseconds(seconds) {
+    var accuracy = 1000 // only up to millisecond accuracy
+    return Math.ceil(seconds * accuracy) / accuracy
+}
+
 class VideoPane extends EventEmitter {
     constructor(element) {
         super();
@@ -288,6 +293,7 @@ class VideoPane extends EventEmitter {
 
         this.desyncCorrection = 0
         var desyncThreshold = 0.01
+        var forceCorrectionThreshold = 1.0
 
         this.element.addEventListener('loadedmetadata', () => {
             this.emit('loadedmetadata')
@@ -295,9 +301,24 @@ class VideoPane extends EventEmitter {
         this.element.addEventListener('timeupdate', () => {
             this.emit('timeupdate', this.element.currentTime)
 
-            if (Math.abs(this.audio.currentTime - this.currentTime) > desyncThreshold) {
-                console.log('desync corrected' + this.element.currentTime + ' | ' + this.audio.currentTime)
-                this.audio.currentTime = this.element.currentTime + 0.05
+            var videoAheadTime = this.currentTime - this.audio.currentTime
+            if (Math.abs(videoAheadTime) > forceCorrectionThreshold) {
+                console.log('massive desync corrected' + this.element.currentTime + ' | ' + this.audio.currentTime)
+                this.audio.currentTime = this.element.currentTime + desyncThreshold
+            } else if (Math.abs(videoAheadTime) > desyncThreshold) {
+                if (videoAheadTime < 0) {
+                    // audio is ahead, minor fix (todo: do something other than force correction)
+                    console.log('correcting audio ahead')
+                    this.audio.currentTime = this.element.currentTime + desyncThreshold
+                } else {
+                    // video is ahead, pause video using playback rate for almost the length of time
+                    console.log('correcting audio behind, pause for a bit')
+                    var originalPlaybackRate = this.element.playbackRate
+                    this.element.playbackRate = 0
+                    window.setTimeout(() => {
+                        this.element.playbackRate = originalPlaybackRate
+                    }, (videoAheadTime - (desyncThreshold / 3)) * 1000)
+                }
             }
         })
 
@@ -315,6 +336,7 @@ class VideoPane extends EventEmitter {
         this.video = video
         this.element.src = video.filename
         this.audio.video = video
+        this.currentTime = 0
     }
 
     togglePlaying() {
@@ -341,6 +363,10 @@ class VideoPane extends EventEmitter {
             this.element.pause();
             this.audio.pause();
         }
+
+        // javascript video player gets glitchy at higher amounts of precision
+        // this will allow it to *snap*
+        this.currentTime = this.element.currentTime
     }
 
     get ratio() {
@@ -348,12 +374,12 @@ class VideoPane extends EventEmitter {
     }
 
     get currentTime() {
-        return this._nextTime || this.element.currentTime;
+        // round to milliseconds for appearance sake
+        return roundAtMilliseconds(this._nextTime || this.element.currentTime);
     }
 
     set currentTime(newTime) {
-        var accuracy = 1000 // only up to millisecond accuracy
-        newTime = Math.ceil(newTime * accuracy) / accuracy
+        newTime = roundAtMilliseconds(newTime)
         if (this.element.seeking) {
             this._nextTime = newTime;
         } else {
