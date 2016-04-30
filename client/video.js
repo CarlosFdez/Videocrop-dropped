@@ -1,71 +1,5 @@
-// represents a range [start, end)
-class Region {
-    constructor(collection, start, end) {
-        this.collection = collection
-        this.start = start
-        this.end = end
-    }
-
-    intersects(position) {
-        return (
-            position >= this.start
-            &&
-            position < this.end) // note: not-inclusive send?
-    }
-
-    /**
-     * Checks if the this region is contained inside the given start or end
-     * As the ending is exclusive, if the given start lines up with our end, it shouldn't interesect
-     */
-    intersectsRange(start, end) {
-        // is the test range start inside?
-        if (start >= this.start && start < this.end) {
-            return true;
-        }
-        // is the test range end inside?
-        if (end > start && end <= this.end) {
-            return true;
-        }
-        return false;
-    }
-}
-
-class RegionCollection {
-    constructor(duration) {
-        this.duration = duration
-        this.regions = []
-    }
-
-    addRegion(start, end) {
-        var region = new Region(this, start, end);
-        this.regions.push(region);
-    }
-
-    getRegionAt(position) {
-        return this.regions.find((region) => region.intersects(position))
-    }
-
-    getRegionsIntersecting(start, end) {
-        return this.regions.filter((region) => region.intersectsRange(start, end))
-    }
-
-    splitAt(position) {
-        let region = this.getRegionAt(position)
-        if (!region)
-            return
-        if (position == region.start || position == region.end)
-            return
-        this.addRegion(position, region.end)
-        region.end = position
-    }
-
-    closestRegionBorder(position) {
-    }
-}
-
 /**
- * Represents a video model object that contains
- * both information about the video and any defined export regions.
+ * Represents a video model object
  */
 class Video {
     constructor(videoMetadata) {
@@ -77,9 +11,6 @@ class Video {
         this._frameDuration = (1 / this.framerate);
 
         this._keyframes = [];
-
-        this.regions = new RegionCollection()
-        this.regions.addRegion(0, this.duration / 2)
 
         this._metadata = videoMetadata // store if I want to debug
     }

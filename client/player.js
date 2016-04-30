@@ -1,9 +1,16 @@
 const EventEmitter = require('events');
 const ffmpeg = require('./ffmpeg-bridge')
+const commands = require('./commands')
+const RegionCollection = require('./region-collection')
 
+// todo: rename, this is no longer just a player
+// VideoPane is the true player class
 class VideoPlayer extends EventEmitter {
     constructor(previewPane) {
         super()
+
+        this._undoStack = []
+        this._redoStack = []
 
         this.previewPane = $(previewPane)
         this.videoPane = new VideoPane(this.previewPane.find('video')[0])
@@ -28,6 +35,9 @@ class VideoPlayer extends EventEmitter {
             this.slider.setVideo(video)
             this.statusBar.video = video
             this.previewPane.addClass('loaded')
+
+            this.regions = new RegionCollection()
+            this.regions.addRange(0, this.video.duration)
         });
     }
 
@@ -58,6 +68,29 @@ class VideoPlayer extends EventEmitter {
     set mode(mode) {
         this._mode = mode
         this.emit('mode-changed', mode)
+    }
+
+    /**
+     * Applies a command that can be later undone.
+     */
+    applyCommand(command) {
+        this._redoStack = [] // clear redos
+        command.apply(this)
+        this._undoStack.push(command)
+    }
+
+    undo() {
+        if (this._undoStack.length == 0) return;
+        var lastCommand = this._undoStack.pop()
+        lastCommand.undo(this)
+        this._redoStack.push(lastCommand)
+    }
+
+    redo() {
+        if (this._redoStack.length == 0) return;
+        var lastCommand = this._redoStack.pop()
+        lastCommand.apply(this)
+        this._undoStack.push(lastCommand)
     }
 }
 
@@ -376,11 +409,12 @@ class PlayerSlider {
     _addCutModeEvents() {
         var player = this.player;
         $(this.canvas).on('mousedown', (evt) => {
-            if (player.mode != VideoPlayer.Mode.CUT) return;
-            if (evt.which != 1) return;
+            if (player.mode != VideoPlayer.Mode.CUT) return
+            if (evt.which != 1) return
 
             var timestamp = this._timestampAt(evt.clientX)
-            this.video.regions.splitAt(timestamp)
+            this.player.applyCommand(new commands.CutRegion(timestamp))
+            this.player.regions.splitAt(timestamp)
         });
     }
 
@@ -426,16 +460,16 @@ class PlayerSlider {
         var thickness = 2; // todo: make configurable
 
         // draw range boxes
-        if (this.video && this.video.regions) {
+        if (this.video && this.player.regions) {
             ctx.fillStyle = "#4488FF"
-            for (let region of this.video.regions.regions) {
+            for (let region of this.player.regions.regions) {
                 let start = positionOf(region.start)
                 let end = positionOf(region.end)
                 ctx.fillRect(start, gutterHeight, end-start, mainHeight)
             }
 
             ctx.fillStyle = "#002277"
-            for (let region of this.video.regions.regions) {
+            for (let region of this.player.regions.regions) {
                 let start = positionOf(region.start)
                 let end = positionOf(region.end)
 

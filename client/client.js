@@ -36,6 +36,14 @@ $(document).ready(() => {
     ipc.send('open-video-request');
 });
 
+Mousetrap.bind("ctrl+z", () => {
+    player.undo()
+})
+
+Mousetrap.bind(["ctrl+shift+z", "ctrl+y"], () => {
+    player.redo()
+})
+
 Mousetrap.bind('space', () => {
     player.togglePlaying();
 });
