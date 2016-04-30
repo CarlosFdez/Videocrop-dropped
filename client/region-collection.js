@@ -58,21 +58,26 @@ class RegionCollection {
         return this.regions.filter((region) => region.intersectsRange(start, end))
     }
 
+    // Returns the idx starting at or after position
     _regionAfterIdx(position) {
         return this.regions.findIndex((region) => region.start >= position)
     }
 
+    // Returns the idx of the last region starting before position
     _regionBeforeIdx(position) {
         var idxTooLate  = this._regionAfterIdx(position)
+        if (idxTooLate == -1) {
+            return this.regions.length - 1 // this happens if we're at the end
+        }
         if (this.regions[idxTooLate].end == position) {
-            return idxTooLate; // this happens when the two regions are touching
+            return idxTooLate // this happens when the two regions are touching
         }
 
         // return the region before
         return Math.max(-1, idxTooLate - 1)
     }
 
-    // Gets the first region at or after the given position
+    // Gets the first region starting at or after the given position
     regionAfter(position) {
         var idx = this._regionAfterIdx(position)
         if (idx >= 0) {
@@ -80,7 +85,7 @@ class RegionCollection {
         }
     }
 
-    // Gets the first region at or before the current position
+    // Gets the latest region starting before the current position
     regionBefore(position) {
         var idx = this._regionBeforeIdx(position)
         if (idx >= 0) {
@@ -88,12 +93,19 @@ class RegionCollection {
         }
     }
 
-    splitAt(position) {
+    canSplitAt(position) {
         let region = this.getRegionAt(position)
         if (!region)
-            return
+            return false
         if (position == region.start || position == region.end)
-            return
+            return false
+        return true
+    }
+
+    splitAt(position) {
+        if (!this.canSplitAt(position)) return
+
+        let region = this.getRegionAt(position)
         var greaterEnd = region.end
         region.end = position
         this.addRange(position, greaterEnd)

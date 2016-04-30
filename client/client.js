@@ -1,6 +1,7 @@
 const VideoPlayer = require('./player');
 const Video = require('./video');
 const ffmpeg = require('./ffmpeg-bridge')
+const commands = require('./commands')
 
 var player = null;
 var video = null;
@@ -64,5 +65,13 @@ Mousetrap.bind('a', () => {
 })
 
 Mousetrap.bind('c', () => {
-    player.mode = VideoPlayer.Mode.CUT
+    player.applyCommand(new commands.CutRegion(this.player.currentTime))
+})
+
+Mousetrap.bind('[', () => {
+    player.applyCommand(new commands.SnapRegionStart(this.player.currentTime))
+})
+
+Mousetrap.bind(']', () => {
+    player.applyCommand(new commands.SnapRegionEnd(this.player.currentTime))
 })

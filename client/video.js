@@ -56,7 +56,6 @@ class Video {
         return Math.max(idx - 1, 0)
     }
 
-    // implement...
     currentKeyFrame(timestamp) {
         var idx = this._indexOfCurrentKeyframe(timestamp);
         return this._keyframes[idx];
@@ -70,6 +69,19 @@ class Video {
     nextKeyframe(timestamp) {
         var idx = this._indexOfCurrentKeyframe(timestamp);
         return this._keyframes[Math.min(this._keyframes.length - 1, idx + 1)];
+    }
+
+    /**
+     * Retrieves the current keyframe such that if the video where to end there,
+     * it would include the given timestamp.
+     */
+    nextOrCurrentKeyframe(timestamp) {
+        var currentKeyFrame = this.currentKeyFrame(timestamp)
+        if (currentKeyFrame == timestamp) {
+            return currentKeyFrame
+        } else {
+            return this.nextKeyframe(timestamp)
+        }
     }
 }
 

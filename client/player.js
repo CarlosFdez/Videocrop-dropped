@@ -74,6 +74,9 @@ class VideoPlayer extends EventEmitter {
      * Applies a command that can be later undone.
      */
     applyCommand(command) {
+        if (command.canApply && !command.canApply(this))
+            return
+
         this._redoStack = [] // clear redos
         command.apply(this)
         this._undoStack.push(command)
@@ -95,8 +98,7 @@ class VideoPlayer extends EventEmitter {
 }
 
 VideoPlayer.Mode = {
-    NORMAL: 1,
-    CUT: 2
+    NORMAL: 1
 }
 
 module.exports = VideoPlayer;
@@ -378,7 +380,6 @@ class PlayerSlider {
         this.startRenderLoop()
 
         this._addNormalModeEvents()
-        this._addCutModeEvents()
     }
 
     _addNormalModeEvents() {
@@ -404,18 +405,6 @@ class PlayerSlider {
         });
 
         // todo: handle mode switch for mode switch while dragging
-    }
-
-    _addCutModeEvents() {
-        var player = this.player;
-        $(this.canvas).on('mousedown', (evt) => {
-            if (player.mode != VideoPlayer.Mode.CUT) return
-            if (evt.which != 1) return
-
-            var timestamp = this._timestampAt(evt.clientX)
-            this.player.applyCommand(new commands.CutRegion(timestamp))
-            this.player.regions.splitAt(timestamp)
-        });
     }
 
     setVideo(video) {
