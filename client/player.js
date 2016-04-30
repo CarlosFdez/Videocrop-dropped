@@ -18,6 +18,7 @@ class VideoPlayer extends EventEmitter {
 
         this.emit('init')
     }
+
     setVideo(video) {
         this.videoPane.setVideo(video)
 
@@ -29,6 +30,23 @@ class VideoPlayer extends EventEmitter {
             this.previewPane.addClass('loaded')
         });
     }
+
+    get currentTime() {
+        return this.videoPane.currentTime
+    }
+
+    set currentTime(newTime) {
+        this.videoPane.currentTime = newTime;
+    }
+
+    play() {
+        this.videoPane.play()
+    }
+
+    pause() {
+        this.videoPane.pause()
+    }
+
     togglePlaying() {
         this.videoPane.togglePlaying()
     }
@@ -87,12 +105,15 @@ class AudioElementController extends EventEmitter {
             this.sourceBuffer.addEventListener('updateend', (evt) => {
                 if (evt.target != this.sourceBuffer) return; // this was a double restartBuffering()
                 //this.sourceBuffer.timestampOffset += 5
-                this.emit('has-data')
+                this.emit('buffer-updated')
             })
 
             // start buffering
-
         });
+
+        this.audioElement.addEventListener('seeked', (evt) => {
+            this.emit('seeked', this.currentTime)
+        })
     }
 
     _requestFrame(startAt, duration) {
@@ -167,7 +188,7 @@ class AudioElementController extends EventEmitter {
     set track(newTrack) {
         this._track = newTrack
         if (this.sourceBuffer.updating) {
-            this.once('has-data', () => { this.track = newTrack })
+            this.once('buffer-updated', () => { this.track = newTrack })
         } else {
             this.sourceBuffer.remove(0, this.video.duration)
         }
@@ -195,10 +216,12 @@ class AudioElementController extends EventEmitter {
     }
 
     startBuffering(onCanStart) {
-        if (this.hasEnoughData) {
-            onCanStart()
+        if (!this.hasEnoughData) {
+            this.once('buffer-updated', () => this.startBuffering(onCanStart))
+        } else if (this.audioElement.seeking) {
+            this.once('seeked', () => this.startBuffering(onCanStart))
         } else {
-            this.once('has-data', () => this.startBuffering(onCanStart))
+            onCanStart()
         }
     }
 
@@ -228,15 +251,18 @@ class VideoPane extends EventEmitter {
         this.element.muted = true
         this.audio = new AudioElementController(this)
 
+        this.desyncCorrection = 0
+        var desyncThreshold = 0.01
+
         this.element.addEventListener('loadedmetadata', () => {
             this.emit('loadedmetadata')
         })
         this.element.addEventListener('timeupdate', () => {
             this.emit('timeupdate', this.element.currentTime)
 
-            if (Math.abs(this.audio.currentTime - this.currentTime) > 0.03) {
-                console.log('desync corrected' + this.element.currentTime + '_' + this.audio.currentTime + "_" + this.element.currentTime)
-                this.audio.currentTime = this.element.currentTime;
+            if (Math.abs(this.audio.currentTime - this.currentTime) > desyncThreshold) {
+                console.log('desync corrected' + this.element.currentTime + ' | ' + this.audio.currentTime)
+                this.audio.currentTime = this.element.currentTime + 0.05
             }
         })
 
@@ -269,8 +295,8 @@ class VideoPane extends EventEmitter {
         if (this.element.paused) {
             this.audio.currentTime = this.currentTime
             this.audio.startBuffering(() => {
-                this.element.play()
                 this.audio.play()
+                this.element.play()
             })
         }
     }
