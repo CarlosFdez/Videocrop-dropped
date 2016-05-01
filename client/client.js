@@ -60,12 +60,8 @@ ipc.on('loaded-metadata', (evt, metadata) => {
     })
 });
 
-Mousetrap.bind("ctrl+z", () => {
-    player.undo()
-})
-
-Mousetrap.bind(["ctrl+shift+z", "ctrl+y"], () => {
-    player.redo()
+Mousetrap.bind(['`', '~'], () => {
+    player.toggleFullscreen()
 })
 
 Mousetrap.bind('space', () => {
@@ -81,6 +77,14 @@ Mousetrap.bind('right', () => {
     player.videoPane.pause();
     player.videoPane.incrementFrame();
 });
+
+Mousetrap.bind("ctrl+z", () => {
+    player.undo()
+})
+
+Mousetrap.bind(["ctrl+shift+z", "ctrl+y"], () => {
+    player.redo()
+})
 
 // todo: different key
 Mousetrap.bind('a', () => {

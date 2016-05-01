@@ -19,6 +19,8 @@ class VideoPlayer extends EventEmitter {
         this.slider = new PlayerSlider(this.previewPane.find('.scrub')[0], this)
         this.statusBar = new StatusBar(this.previewPane.find('.status-bar'), this.videoPane)
 
+        this.fullscreenSlider = new PlayerSlider(this.previewPane.find('.fullscreen-scrub')[0], this)
+
         this.mode = VideoPlayer.Mode.NORMAL
 
         this.videoPane.element.addEventListener('click', () => {
@@ -64,12 +66,21 @@ class VideoPlayer extends EventEmitter {
         this.videoPane.once('loadedmetadata', () => {
             this.video = video
             this.slider.setVideo(video)
+            this.fullscreenSlider.setVideo(video)
             this.statusBar.video = video
             this.previewPane.addClass('loaded')
 
             this.regions = new RegionCollection()
             this.regions.addRange(0, this.video.duration)
         });
+    }
+
+    toggleFullscreen() {
+        if (document.webkitFullscreenElement) {
+            document.webkitExitFullscreen()
+        } else {
+            $('.video-wrap')[0].webkitRequestFullscreen()
+        }
     }
 
     get currentTime() {
@@ -140,6 +151,7 @@ class PlayerSlider {
         this.player = player
         this.videoPane = player.videoPane
         this.context = this.canvas.getContext('2d')
+        this.rendering = true
         this.startRenderLoop()
 
         this._addNormalModeEvents()
@@ -188,6 +200,7 @@ class PlayerSlider {
     }
 
     render() {
+        if (!this.rendering) return;
         if (!this.video) return;
 
         var video = this.video;
