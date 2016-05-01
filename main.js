@@ -54,5 +54,9 @@ app.on('ready', () => {
         })
     });
 
+    ipc.on('export-video', (evt, exportSettings) => {
+        mainWindow.send('debug-log', 'do export later')
+    })
+
     videoServer.bindToElectron(ipc, mainWindow)
 });

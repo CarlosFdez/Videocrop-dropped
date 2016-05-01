@@ -13,9 +13,9 @@
             <div class="sidebar">
                 <div>
                     Container:
-                    <select class="container-select">
-                        <option>MP4</option>
-                        <option>MKV</option>
+                    <select name="container-select">
+                        <option value="mp4">MP4</option>
+                        <option value="mkv">MKV</option>
                     </select>
                 </div>
 
@@ -26,31 +26,32 @@
 
                 <div class="indent">
                     <label>
-                        <input type="radio" name="audio-option">
+                        <input type="radio" name="audio-option" value="-1" checked="checked">
                         Keep Audio Tracks in Video
                     </label>
                     <label>
-                        <input type="radio" name="audio-option">
+                        <input type="radio" name="audio-option" value="1">
                         Keep First Audio Track in Video
                     </label>
                     <label>
-                        <input type="radio" name="audio-option">
+                        <input type="radio" name="audio-option" value="0">
                         Omit Audio Tracks from Video
                     </label>
                 </div>
 
                 <div class="separate">
                     <label>
-                        <input type="radio" name="video-splitting">
+                        <input type="radio" name="video-splitting" value="join" checked="checked">
                         Join segments into one video
                     </label>
                     <label>
-                        <input type="radio" name="video-splitting">
+                        <input type="radio" name="video-splitting" value="split">
                         Write segments as separate videos
                     </label>
                 </div>
 
-                <div class="export-button">Export</div>
+                <div class="open-button button">Open File</div>
+                <div class="export-button button">Export</div>
             </div>
             <div class="video-container">
                 <div class='video-wrap'>

@@ -101,14 +101,21 @@ html, body {
     margin-left: 15px;
 }
 
-.export-button {
+.sidebar .open-button {
     margin-top: auto;
+}
+
+.sidebar .export-button {
+    margin-top: 10px;
+}
+
+.button {
     background-color: #7A97BD;
     text-align: center;
     line-height: 2em;
 }
 
-.export-button:hover {
+.button:hover {
     background-color: #818E9E;
     cursor: pointer;
 }

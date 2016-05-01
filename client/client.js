@@ -8,6 +8,34 @@ var video = null;
 
 const ipc = require('electron').ipcRenderer;
 
+$(document).ready(() => {
+    player = new VideoPlayer($(".main-container"))
+});
+
+$(document).on('dragenter', (evt) => {
+    evt.preventDefault()
+    console.log('file dragged over, do something later')
+})
+
+$(document).on('dragover', (evt) => {
+    evt.preventDefault()
+})
+
+$(document).on('dragleave', (evt) => {
+    evt.preventDefault()
+    console.log('file no longer dragged over, do something later')
+})
+
+document.addEventListener('drop', (evt) => {
+    // for now, assume that its always a file. Once we have exceptions we can adjust
+    evt.preventDefault()
+    console.log('file dropped')
+    var filename = evt.dataTransfer.files[0].path
+    ipc.send('open-video-request', filename)
+
+    return false
+})
+
 ipc.on('debug-log', (evt, data) => {
     console.log(data)
 });
@@ -30,11 +58,6 @@ ipc.on('loaded-metadata', (evt, metadata) => {
     reader.on('close', () => {
         console.log(new Date().toString() + ' finished loading');
     })
-});
-
-$(document).ready(() => {
-    player = new VideoPlayer($(".main-container"));
-    ipc.send('open-video-request');
 });
 
 Mousetrap.bind("ctrl+z", () => {
