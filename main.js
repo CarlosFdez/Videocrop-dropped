@@ -28,7 +28,6 @@ app.on('ready', () => {
 
     // and load the index.html of the app.
     mainWindow.loadURL('file://' + __dirname + '/client/index.html');
-    //mainWindow.loadURL('file://' + __dirname + '/client/testmediasource.html');
 
     // Open the DevTools.
     mainWindow.webContents.openDevTools();

@@ -33,7 +33,7 @@ ipc.on('loaded-metadata', (evt, metadata) => {
 });
 
 $(document).ready(() => {
-    player = new VideoPlayer($(".preview-pane"));
+    player = new VideoPlayer($(".main-container"));
     ipc.send('open-video-request');
 });
 
